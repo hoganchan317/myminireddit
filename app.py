@@ -83,7 +83,7 @@ comment_manager = CommentManager()
 # ================== MySQL 直连配置（pymysql） ==================
 
 DB_USER = os.environ.get("DB_USER", "root")
-DB_PASS = os.environ.get("DB_PASS", "Hhaazzeell602")  # 本地开发用
+DB_PASS = os.environ.get("DB_PASS", "Hhaazzeell602")  # 本地默认
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_PORT = int(os.environ.get("DB_PORT", "3306"))
 DB_NAME = os.environ.get("DB_NAME", "myminireddit")
