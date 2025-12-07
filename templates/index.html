@@ -12,9 +12,14 @@
     <div class="flex justify-between items-center mb-8">
         <a href="/" class="text-3xl font-bold text-orange-300">MyMiniReddit</a>
 
-        <div class="space-x-4">
+            <div class="space-x-4">
             {% if username %}
                 <span class="text-sm opacity-80">已登录：{{ username }}</span>
+                {% if is_admin %}
+                <a href="/admin/users" class="px-3 py-1 bg-amber-500/80 rounded text-sm font-semibold">
+                    用户管理
+                </a>
+                {% endif %}
                 <a href="/post/new" class="px-3 py-1 bg-emerald-500 rounded text-sm font-semibold">发帖</a>
                 <a href="/logout" class="px-3 py-1 bg-slate-700 rounded text-sm">退出</a>
             {% else %}
@@ -26,25 +31,36 @@
 
     <!-- 帖子列表 -->
     <div class="space-y-4">
-        {% if posts %}
-            {% for p in posts %}
-                <a href="/post/{{ p[0] }}" class="block bg-slate-800/80 rounded-xl p-4 hover:bg-slate-700 transition">
-                    <div class="flex justify-between items-center mb-1">
-                        <h2 class="text-xl font-semibold">{{ p[1] }}</h2>
-                        <span class="text-xs opacity-70">
-                            by {{ p[4] }} · {{ p[3].strftime('%Y-%m-%d %H:%M') if p[3] else '' }}
-                        </span>
-                    </div>
-                    <p class="text-sm opacity-80 line-clamp-2">
-                        {{ p[2][:120] }}{% if p[2]|length > 120 %}...{% endif %}
-                    </p>
-                </a>
-            {% endfor %}
-        {% else %}
-            <div class="text-center text-slate-400 py-16">
-                还没有任何帖子，快<a href="/post/new" class="text-emerald-400 underline">发第一个</a>吧！
+    {% if posts %}
+        {% for p in posts %}
+        <div class="bg-slate-800/80 rounded-xl p-4 hover:bg-slate-700 transition">
+            <div class="flex justify-between items-center mb-1">
+            <a href="/post/{{ p[0] }}" class="text-xl font-semibold hover:underline">
+                {{ p[1] }}
+            </a>
+            <div class="flex items-center gap-2">
+                <span class="text-xs opacity-70">
+                by {{ p[4] }} · {{ p[3].strftime('%Y-%m-%d %H:%M') if p[3] else '' }}
+                </span>
+                {% if is_admin %}
+                <form method="post"
+                        action="/admin/post/{{ p[0] }}/delete"
+                        onsubmit="return confirm('确定要删除这篇帖子吗？');">
+                    <button class="text-xs text-red-400 border border-red-500/50 px-2 py-1 rounded hover:bg-red-500/20">
+                    删帖
+                    </button>
+                </form>
+                {% endif %}
             </div>
-        {% endif %}
+            </div>
+            <p class="text-sm opacity-80 line-clamp-2">
+            {{ p[2][:120] }}{% if p[2]|length > 120 %}...{% endif %}
+            </p>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center text-slate-400 py-8">还没有任何帖子，快去发第一帖！</div>
+    {% endif %}
     </div>
 
 </div>
