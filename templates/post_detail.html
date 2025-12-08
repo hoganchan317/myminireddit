@@ -15,37 +15,53 @@
             <h1 class="text-2xl font-bold">{{ post.title }}</h1>
             {% if username and (username == post.username or is_admin) %}
                 <a href="/post/{{ post.id }}/edit"
-                class="text-xs text-sky-300 border border-sky-500/60 px-3 py-1 rounded hover:bg-sky-500/20">
+                   class="text-xs text-sky-300 border border-sky-500/60 px-3 py-1 rounded hover:bg-sky-500/20">
                     编辑
                 </a>
             {% endif %}
         </div>
-        <div class="text-xs text-slate-400 mb-4">
-        {% if post.topic_name %}
-            <span class="mr-2 text-emerald-300">[{{ post.topic_name }}]</span>
-        {% endif %}
-        by {{ post.username }} · {{ post.created_at }}
+
+        <!-- 帖子信息 + 举报帖子按钮 -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="text-xs text-slate-400">
+                {% if post.topic_name %}
+                    <span class="mr-2 text-emerald-300">[{{ post.topic_name }}]</span>
+                {% endif %}
+                by {{ post.username }} · {{ post.created_at }}
+            </div>
+            {% if username %}
+                <form method="post" action="/report/post/{{ post.id }}"
+                      onsubmit="return confirm('确定要举报这个帖子吗？');">
+                    <button class="text-xs text-amber-300 border border-amber-400/60 px-2 py-1 rounded hover:bg-amber-500/20">
+                        举报帖子
+                    </button>
+                </form>
+            {% endif %}
         </div>
+
         <div class="whitespace-pre-wrap text-sm leading-relaxed">
             {{ post.content }}
         </div>
     </article>
+
     <!-- 在线人数 & 正在输入状态 -->
     <div class="mt-2 text-xs text-slate-400 flex gap-4">
         <span id="online-count">在线人数：1</span>
         <span id="typing-status"></span>
     </div>
+
     <!-- 评论列表 -->
     <section class="mt-6">
-        <h2 class="text-lg font-semibold mb-3">评论</h2>
-        <div id="comment-list" class="space-y-3">
+    <h2 class="text-lg font-semibold mb-3">评论</h2>
+    <div id="comment-list" class="space-y-3">
         {% if comments %}
-            {% for c in comments %}
+        {% for c in comments %}
             <div class="bg-slate-800/70 rounded-lg p-3">
-                <div class="flex justify-between items-center mb-1">
+            <div class="flex justify-between items-center mb-1">
                 <div class="text-xs text-slate-400">
-                    {{ c[3] }} · {{ c[2].strftime('%Y-%m-%d %H:%M') if c[2] else '' }}
+                {{ c[3] }} · {{ c[2].strftime('%Y-%m-%d %H:%M') if c[2] else '' }}
                 </div>
+                <div class="flex items-center gap-2">
                 {% if is_admin %}
                     <form method="post"
                         action="/admin/comment/{{ c[0] }}/delete"
@@ -56,18 +72,29 @@
                     </button>
                     </form>
                 {% endif %}
+                {% if username %}
+                    <form method="post"
+                        action="/report/comment/{{ c[0] }}"
+                        onsubmit="return confirm('确定要举报这条评论吗？');">
+                    <input type="hidden" name="post_id" value="{{ post.id }}">
+                    <button class="text-xs text-amber-300 border border-amber-400/60 px-2 py-1 rounded hover:bg-amber-500/20">
+                        举报
+                    </button>
+                    </form>
+                {% endif %}
                 </div>
-                <div class="text-sm whitespace-pre-wrap">
+            </div>
+            <div class="text-sm whitespace-pre-wrap">
                 {{ c[1] }}
-                </div>
             </div>
-            {% endfor %}
+            </div>
+        {% endfor %}
         {% else %}
-            <div class="text-sm text-slate-500">
+        <div class="text-sm text-slate-500">
             还没有评论，快来抢沙发～
-            </div>
-        {% endif %}
         </div>
+        {% endif %}
+    </div>
     </section>
 
     <!-- 发表评论 -->
@@ -77,7 +104,8 @@
                 <input type="hidden" name="post_id" value="{{ post.id }}">
                 <label class="block text-sm text-slate-300 mb-1">发表评论（{{ username }}）</label>
                 <textarea id="comment-input" name="content" rows="4" required
-                        class="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>                <button class="px-4 py-2 bg-emerald-500 rounded text-sm font-semibold">
+                          class="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+                <button class="px-4 py-2 bg-emerald-500 rounded text-sm font-semibold">
                     提交评论
                 </button>
             </form>
@@ -108,8 +136,10 @@
         const div = document.createElement('div');
         div.className = "bg-slate-800/70 rounded-lg p-3";
         div.innerHTML = `
-            <div class="text-xs text-slate-400 mb-1">
-                ${c.username} · ${c.created_at}
+            <div class="flex justify-between items-center mb-1">
+              <div class="text-xs text-slate-400">
+                  ${c.username} · ${c.created_at}
+              </div>
             </div>
             <div class="text-sm whitespace-pre-wrap">
                 ${c.content}
@@ -128,6 +158,7 @@
             const data = JSON.parse(event.data);
 
             if (data.type === "new_comment") {
+                // 自己发的评论在刷新后的 HTML 里已经有了，这里只插入别人的
                 if (data.username !== currentUser) {
                     addCommentToDOM(data);
                 }
