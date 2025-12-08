@@ -19,20 +19,17 @@
     </div>
 
     <div>
-        <label class="block mb-1 text-sm text-slate-300">板块 / 分类（aspect）</label>
-        <select name="topic_id"
-                class="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600">
+    <label class="block mb-1 text-sm text-slate-300">板块 / 分类（aspect）</label>
+    <select name="topic_id"
+            class="w-full px-3 py-2 rounded bg-slate-800 border border-slate-600">
         <option value="">（不选择）</option>
         {% for t in topics %}
-            <option value="{{ t[0] }}">{{ t[1] }}</option>
+        <option value="{{ t[0] }}">{{ t[1] }}</option>
         {% endfor %}
-        </select>
-        <p class="text-xs text-slate-400 mt-1">
-        或者，你可以建议一个新的板块名称（需要管理员审核）：
-        </p>
-        <input name="new_topic_name"
-            placeholder="例如：Python 学习、动画讨论区..."
-            class="w-full mt-1 px-3 py-2 rounded bg-slate-800 border border-slate-600">
+    </select>
+    <p class="text-xs text-slate-400 mt-1">
+        若你想创建新的板块，请在首页点击「创建板块」按钮向管理员提交申请。
+    </p>
     </div>
 
     <div>
