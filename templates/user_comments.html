@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>{{ profile_username }} 的评论 - MyMiniReddit</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+<div class="max-w-4xl mx-auto p-6">
+
+  <!-- 顶部导航 -->
+  <div class="flex justify-between items-center mb-6">
+    <a href="/" class="text-slate-400 text-sm">&larr; 返回首页</a>
+    <div class="space-x-3 text-sm">
+      {% if username %}
+        <span class="opacity-80">当前登录：{{ username }}</span>
+
+        <a href="/notifications"
+           class="px-3 py-1 bg-slate-800 rounded">
+          通知
+          {% if unread_count and unread_count > 0 %}
+            <span class="ml-1 text-xs text-emerald-400">
+              ({{ unread_count }})
+            </span>
+          {% endif %}
+        </a>
+
+        <a href="/settings"
+           class="px-3 py-1 bg-slate-800 rounded">
+          设置
+        </a>
+        <a href="/logout"
+           class="px-3 py-1 bg-slate-700 rounded">
+          退出
+        </a>
+      {% else %}
+        <a href="/login"
+           class="px-3 py-1 bg-sky-500 rounded font-semibold">
+          登录
+        </a>
+        <a href="/register"
+           class="px-3 py-1 bg-emerald-500 rounded font-semibold">
+          注册
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 标题 + 导航 -->
+  <section class="mb-6">
+    <h1 class="text-2xl font-bold mb-2">{{ profile_username }} 的评论</h1>
+    <div class="text-sm text-slate-300 space-x-3">
+      <a href="/user/{{ profile_username }}" class="hover:underline">TA 的帖子</a>
+      <span class="text-slate-500">|</span>
+      <span class="font-semibold text-emerald-300">TA 的评论</span>
+      <span class="text-slate-500">|</span>
+      <a href="/user/{{ profile_username }}/likes" class="hover:underline">TA 点赞的帖子</a>
+    </div>
+  </section>
+
+  <!-- 评论列表 -->
+  <section>
+    {% if comments %}
+      <div class="space-y-4">
+        {% for c in comments %}
+          <!-- c: (comment_id, content, created_at, post_id, post_title, topic_id, topic_name) -->
+          <div class="bg-slate-800/80 rounded-xl p-4 hover:bg-slate-700 transition">
+            <div class="flex justify-between items-center mb-1 text-xs text-slate-400">
+              <div>
+                发表于
+                <a href="/post/{{ c[3] }}" class="text-sky-400 hover:underline">
+                  {{ c[4] }}
+                </a>
+                {% if c[6] %}
+                  <span class="ml-2 text-emerald-300">
+                    [<a href="/topic/{{ c[5] }}" class="hover:underline">{{ c[6] }}</a>]
+                  </span>
+                {% endif %}
+              </div>
+              <div>
+                {{ c[2].strftime('%Y-%m-%d %H:%M') if c[2] else '' }}
+              </div>
+            </div>
+            <div class="mt-1 text-sm opacity-90 whitespace-pre-wrap">
+              {{ c[1] }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center text-slate-400 py-6">
+        这个用户还没有发表过评论。
+      </div>
+    {% endif %}
+  </section>
+
+</div>
+</body>
+</html>

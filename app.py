@@ -90,7 +90,7 @@ conn = pymysql.connect(
 )
 cur = conn.cursor()
 
-# ================== 建表：用户、帖子、评论、板块、举报 ==================
+# ================== 建表：users, posts, comments, topics, reports, post_likes, notifications ==================
 
 cur.execute("""
 CREATE TABLE IF NOT EXISTS users (
@@ -150,6 +150,17 @@ CREATE TABLE IF NOT EXISTS reports (
     status ENUM('pending', 'handled') NOT NULL DEFAULT 'pending',
     created_at DATETIME,
     FOREIGN KEY (reporter_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+""")
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS post_likes (
+    post_id INT NOT NULL,
+    user_id INT NOT NULL,
+    created_at DATETIME,
+    PRIMARY KEY (post_id, user_id),
+    FOREIGN KEY (post_id) REFERENCES posts(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """)
 
@@ -519,6 +530,137 @@ async def user_profile(username: str, request: Request, token: str = Cookie(None
     )
 
 
+@app.get("/user/{username}/comments", response_class=HTMLResponse)
+async def user_comments(username: str, request: Request, token: str = Cookie(None)):
+    current_username = get_username_from_token(token)
+
+    # 查这个用户是否存在
+    cur.execute("SELECT id, is_admin, is_banned FROM users WHERE username = %s", (username,))
+    row = cur.fetchone()
+    if not row:
+        return HTMLResponse("用户不存在。<a href='/'>返回首页</a>", status_code=404)
+
+    user_id, user_is_admin, user_is_banned = row
+
+    # 查这个用户的评论（帖子未删、评论未删）
+    cur.execute("""
+        SELECT
+            c.id,              -- 0 评论ID
+            c.content,         -- 1 评论内容
+            c.created_at,      -- 2 评论时间
+            p.id AS post_id,   -- 3 所属帖子ID
+            p.title AS post_title,  -- 4 帖子标题
+            t.id AS topic_id,       -- 5 板块ID（可能为 NULL）
+            t.name AS topic_name    -- 6 板块名称（可能为 NULL）
+        FROM comments c
+        JOIN posts p ON c.post_id = p.id
+        LEFT JOIN topics t ON p.topic_id = t.id
+        WHERE c.user_id = %s
+          AND c.is_deleted = 0
+          AND p.is_deleted = 0
+        ORDER BY c.created_at DESC
+        LIMIT 100
+    """, (user_id,))
+    comments = cur.fetchall()
+
+    current_is_admin = is_admin(current_username) if current_username else False
+
+    # 未读通知数（用于导航）
+    unread_count = 0
+    if current_username:
+        cu_id = get_user_id(current_username)
+        if cu_id:
+            unread_count = get_unread_notifications_count(cu_id)
+
+    return templates.TemplateResponse(
+        "user_comments.html",
+        {
+            "request": request,
+            "username": current_username,    # 当前登录用户
+            "profile_username": username,    # 正在查看的用户
+            "profile_user_id": user_id,
+            "profile_is_admin": bool(user_is_admin),
+            "profile_is_banned": bool(user_is_banned),
+            "comments": comments,
+            "current_is_admin": current_is_admin,
+            "unread_count": unread_count,
+        },
+    )
+
+
+@app.get("/my/comments")
+async def my_comments_redirect(token: str = Cookie(None)):
+    username = get_username_from_token(token)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    return RedirectResponse(f"/user/{username}/comments", status_code=302)
+
+
+@app.get("/user/{username}/likes", response_class=HTMLResponse)
+async def user_likes(username: str, request: Request, token: str = Cookie(None)):
+    current_username = get_username_from_token(token)
+
+    # 查这个用户是否存在
+    cur.execute("SELECT id, is_admin, is_banned FROM users WHERE username = %s", (username,))
+    row = cur.fetchone()
+    if not row:
+        return HTMLResponse("用户不存在。<a href='/'>返回首页</a>", status_code=404)
+
+    user_id, user_is_admin, user_is_banned = row
+
+    # 查这个用户点赞过的帖子（只显示未删除帖子）
+    cur.execute("""
+        SELECT
+            p.id AS post_id,          -- 0
+            p.title,                  -- 1
+            p.created_at,             -- 2
+            u.username AS author,     -- 3
+            t.id AS topic_id,         -- 4
+            t.name AS topic_name,     -- 5
+            pl.created_at AS liked_at -- 6 点赞时间
+        FROM post_likes pl
+        JOIN posts p ON pl.post_id = p.id
+        JOIN users u ON p.user_id = u.id
+        LEFT JOIN topics t ON p.topic_id = t.id
+        WHERE pl.user_id = %s
+          AND p.is_deleted = 0
+        ORDER BY pl.created_at DESC
+        LIMIT 100
+    """, (user_id,))
+    likes = cur.fetchall()
+
+    current_is_admin = is_admin(current_username) if current_username else False
+
+    unread_count = 0
+    if current_username:
+        cu_id = get_user_id(current_username)
+        if cu_id:
+            unread_count = get_unread_notifications_count(cu_id)
+
+    return templates.TemplateResponse(
+        "user_likes.html",
+        {
+            "request": request,
+            "username": current_username,    # 当前登录用户
+            "profile_username": username,    # 正在查看的用户
+            "profile_user_id": user_id,
+            "profile_is_admin": bool(user_is_admin),
+            "profile_is_banned": bool(user_is_banned),
+            "likes": likes,
+            "current_is_admin": current_is_admin,
+            "unread_count": unread_count,
+        },
+    )
+
+
+@app.get("/my/likes")
+async def my_likes_redirect(token: str = Cookie(None)):
+    username = get_username_from_token(token)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+    return RedirectResponse(f"/user/{username}/likes", status_code=302)
+
+
 @app.get("/notifications", response_class=HTMLResponse)
 async def notifications_page(request: Request, token: str = Cookie(None)):
     username = get_username_from_token(token)
@@ -693,8 +835,29 @@ async def admin_approve_topic(topic_id: int, token: str = Cookie(None)):
     if not username or not is_admin(username):
         return RedirectResponse("/", status_code=302)
 
+    # 先查出这个 topic 的信息
+    cur.execute("SELECT name, created_by FROM topics WHERE id = %s", (topic_id,))
+    row = cur.fetchone()
+    if not row:
+        return RedirectResponse("/admin/topics", status_code=302)
+
+    topic_name, created_by = row
+
+    # 标记为通过
     cur.execute("UPDATE topics SET is_approved = 1 WHERE id = %s", (topic_id,))
     conn.commit()
+
+    # 给创建者发送通知（如果有创建者）
+    if created_by:
+        msg = f"你申请的板块《{topic_name}》已通过审核"
+        create_notification(
+            user_id=created_by,
+            type_="topic_approved",
+            message=msg,
+            # 可以不关联 post/comment
+            from_user_id=get_user_id(username),  # 管理员 ID
+        )
+
     return RedirectResponse("/admin/topics", status_code=302)
 
 
@@ -736,8 +899,39 @@ async def admin_handle_report(report_id: int, token: str = Cookie(None)):
     if not username or not is_admin(username):
         return RedirectResponse("/", status_code=302)
 
+    # 先查出举报详情
+    cur.execute("""
+        SELECT type, target_id, reporter_id
+        FROM reports
+        WHERE id = %s
+    """, (report_id,))
+    row = cur.fetchone()
+    if not row:
+        return RedirectResponse("/admin/reports", status_code=302)
+
+    report_type, target_id, reporter_id = row
+
+    # 标记已处理
     cur.execute("UPDATE reports SET status = 'handled' WHERE id = %s", (report_id,))
     conn.commit()
+
+    # 给举报人发通知
+    # 拼一个简短说明
+    if report_type == "post":
+        target_label = f"帖子 ID {target_id}"
+    else:
+        target_label = f"评论 ID {target_id}"
+
+    msg = f"你对 {target_label} 的举报已由管理员处理"
+
+    create_notification(
+        user_id=reporter_id,
+        type_="report_handled",
+        message=msg,
+        # 可选：粗暴地把 related_post_id 留空，因为我们只有 ID
+        from_user_id=get_user_id(username),  # 管理员 ID
+    )
+
     return RedirectResponse("/admin/reports", status_code=302)
 
 
@@ -934,6 +1128,7 @@ async def topic_page(topic_id: int, request: Request, token: str = Cookie(None))
 async def post_detail(post_id: int, request: Request, token: str = Cookie(None)):
     username = get_username_from_token(token)
 
+    # 查询帖子
     cur.execute("""
         SELECT p.id, p.title, p.content, p.created_at, u.username, p.user_id, t.name
         FROM posts p
@@ -956,6 +1151,7 @@ async def post_detail(post_id: int, request: Request, token: str = Cookie(None))
         "topic_name": row[6],
     }
 
+    # 查询评论
     cur.execute("""
         SELECT c.id, c.content, c.created_at, u.username
         FROM comments c
@@ -967,12 +1163,22 @@ async def post_detail(post_id: int, request: Request, token: str = Cookie(None))
 
     admin_flag = is_admin(username) if username else False
 
+    # 点赞信息
     likes_count = get_post_likes_count(post_id)
     user_like_flag = False
+    current_user_id = None
     if username:
-        uid = get_user_id(username)
-        if uid:
-            user_like_flag = user_liked_post(uid, post_id)
+        current_user_id = get_user_id(username)
+        if current_user_id:
+            user_like_flag = user_liked_post(current_user_id, post_id)
+
+    # 当前用户是否是作者
+    is_author = bool(current_user_id and current_user_id == post["user_id"])
+
+    # 未读通知数（用于导航）
+    unread_count = 0
+    if username and current_user_id:
+        unread_count = get_unread_notifications_count(current_user_id)
 
     return templates.TemplateResponse(
         "post_detail.html",
@@ -984,6 +1190,8 @@ async def post_detail(post_id: int, request: Request, token: str = Cookie(None))
             "is_admin": admin_flag,
             "likes_count": likes_count,
             "user_liked": user_like_flag,
+            "is_author": is_author,
+            "unread_count": unread_count,
         },
     )
 
@@ -1256,3 +1464,38 @@ async def edit_post(post_id: int, title: str = Form(), content: str = Form(), to
     conn.commit()
 
     return RedirectResponse(f"/post/{post_id}", status_code=302)
+
+
+@app.post("/post/{post_id}/delete")
+async def delete_post(post_id: int, token: str = Cookie(None)):
+    """
+    允许帖子作者本人或管理员删除帖子（软删除：is_deleted=1）。
+    删除后重定向回首页。
+    """
+    username = get_username_from_token(token)
+    if not username:
+        return RedirectResponse("/login", status_code=302)
+
+    # 查帖子信息
+    cur.execute("SELECT user_id, is_deleted FROM posts WHERE id = %s", (post_id,))
+    row = cur.fetchone()
+    if not row or row[1] == 1:
+        return HTMLResponse("帖子不存在或已被删除。<a href='/'>返回首页</a>", status_code=404)
+
+    post_user_id, _ = row
+    current_user_id = get_user_id(username)
+    if not current_user_id:
+        return RedirectResponse("/login", status_code=302)
+
+    # 权限：作者本人或管理员
+    if current_user_id != post_user_id and not is_admin(username):
+        return HTMLResponse("你没有权限删除这个帖子。<a href='/'>返回首页</a>", status_code=403)
+
+    # 软删除
+    cur.execute("UPDATE posts SET is_deleted = 1 WHERE id = %s", (post_id,))
+    conn.commit()
+
+    return RedirectResponse("/", status_code=302)
+
+
+

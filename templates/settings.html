@@ -60,8 +60,15 @@
           打开 {{ username }} 的主页 →
         </a>
       </p>
-      <p class="mt-2 text-xs text-slate-500">
-        以后可以在这里继续加「我的评论列表」「我点赞的帖子」等功能。
+      <p>
+        <a href="/user/{{ username }}/comments" class="text-sky-400 hover:underline">
+          查看我的评论列表 →
+        </a>
+      </p>
+      <p>
+        <a href="/user/{{ username }}/likes" class="text-sky-400 hover:underline">
+          查看我点赞的帖子 →
+        </a>
       </p>
     </div>
   </section>
